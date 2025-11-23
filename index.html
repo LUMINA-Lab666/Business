@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放疗项目 ROI 计算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Flex Column Layout to push footer to bottom naturally */
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f4f8; min-height: 100vh; display: flex; flex-direction: column; }
+        
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); }
+        
+        .toggle-checkbox:checked { right: 0; border-color: #68D391; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #68D391; }
+        
+        .comp-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; margin-bottom: 6px; }
+        .comp-label { color: #64748b; }
+        .comp-val { font-weight: 700; color: #1e293b; }
+        
+        .diff-row { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; font-weight: bold; font-size: 0.95rem; display: flex; justify-content: space-between; }
+        .detail-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748b; margin-bottom: 3px; }
+        
+        .legend-dot { width: 8px; height: 8px; display: inline-block; border-radius: 50%; margin-right: 4px; }
+        
+        .lang-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+        .lang-btn:hover, .lang-btn.active { background: white; color: #1e3a8a; font-weight: bold; }
+        
+        /* Static Footer Style */
+        .static-footer { width: 100%; background-color: #1e293b; color: white; padding: 24px; font-size: 0.85rem; margin-top: auto; }
+        .rate-input { background: transparent; border: none; border-bottom: 1px solid #fbbf24; color: #fbbf24; font-weight: bold; width: 70px; text-align: center; outline: none; }
+        
+        /* Consistent Input Styling */
+        input[type="number"] { -moz-appearance: textfield; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .std-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 0.5rem; text-align: right; font-family: monospace; font-weight: 700; color: #1e293b; transition: border-color 0.2s; }
+        .std-input:focus { outline: none; border-color: #3b82f6; ring: 2px solid #3b82f6; }
+    </style>
+</head>
+<body class="text-gray-700">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-900 text-white p-4 shadow-md sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-calculator"></i> <span id="navTitle">放疗项目 ROI 计算器</span>
+            </div>
+            <div class="flex gap-2">
+                <button class="lang-btn active" id="btn-zh" onclick="setLang('zh')">🇨🇳 中文</button>
+                <button class="lang-btn" id="btn-en" onclick="setLang('en')">🇺🇸 EN</button>
+                <button class="lang-btn" id="btn-id" onclick="setLang('id')">🇮🇩 ID</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-6 mt-4">
+        
+        <!-- Left Column: Inputs -->
+        <div class="lg:col-span-4 space-y-4">
+            
+            <!-- 1. Market Params -->
+            <div class="card p-6 border-l-4 border-blue-500">
+                <h3 class="text-lg font-bold mb-4 text-gray-800 section-header border-b pb-2"><span data-t="marketParams">市场与财务参数</span></h3>
+                
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-gray-500 mb-1" data-t="bpjsRate">BPJS报销额 (Rp/次)</label>
+                    <input type="number" id="priceInput" value="1100000" step="100000" class="std-input text-blue-700 bg-blue-50">
+                </div>
+
+                <div class="flex flex-row gap-4 mb-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 mb-1" data-t="workingDays">年工作日</label>
+                        <input type="number" id="workingDaysInput" value="250" class="std-input">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-gray-500 mb-1" data-t="lifecycle">周期 (年)</label>
+                        <input type="number" id="lifecycleInput" value="12" class="std-input">
+                    </div>
+                </div>
+
+                <div class="mb-2 p-3 bg-gray-50 rounded border border-gray-200">
+                    <label class="block text-xs font-bold text-gray-500 mb-2" data-t="complexRatio">复杂病例比例</label>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span data-t="standardCases">普通</span>
+                        <span class="font-bold text-orange-600"><span id="complexLabel">12</span>%</span>
+                    </div>
+                    <input type="range" id="mixSlider" min="0" max="30" value="12" class="w-full h-2 bg-gray-200 rounded-lg cursor-pointer accent-orange-500">
+                    
+                    <div class="mt-3 flex items-start gap-2 text-xs text-gray-600 bg-blue-50 p-2 rounded border border-blue-100">
+                        <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
+                        <div id="impactNoteHtml"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Strategy -->
+            <div class="card p-6 border-l-4 border-purple-500">
+                <h3 class="text-lg font-bold mb-4 text-gray-800 section-header border-b pb-2"><span data-t="compStrategy">竞争对手策略</span></h3>
+                
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-bold text-gray-700" data-t="addTomo">增加 TOMO?</span>
+                    <div class="relative inline-block w-12 align-middle select-none">
+                        <input type="checkbox" id="competitorToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 cursor-pointer"/>
+                        <label for="competitorToggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                    </div>
+                </div>
+                
+                <div id="competitorStatus" class="text-xs p-2 rounded bg-gray-100 mb-4 font-semibold"></div>
+
+                <h4 class="text-sm font-bold text-gray-700 mb-3"><span data-t="capexInputTitle">CapEx</span> (Miliar Rp)</h4>
+                
+                <!-- Aurora -->
+                <div class="mb-3 bg-blue-50 p-3 rounded border border-blue-100 shadow-sm">
+                    <div class="flex justify-between text-xs mb-2"><span class="font-bold text-blue-800">NeuRT Aurora</span></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-[10px] text-gray-500 block mb-1" data-t="deviceCost">设备</label><input type="number" id="auroraCost" value="46.5" step="0.1" class="std-input text-xs"></div>
+                        <div><label class="text-[10px] text-gray-500 block mb-1" data-t="bunkerCost">机房</label><input type="number" id="auroraBunker" value="6.2" step="0.1" class="std-input text-xs"></div>
+                    </div>
+                </div>
+
+                <!-- Comp -->
+                <div class="bg-gray-50 p-3 rounded border border-gray-200 shadow-sm">
+                    <div class="flex justify-between text-xs mb-2"><span class="font-bold text-gray-700" id="compConfigTitle">RT</span></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div><label class="text-[10px] text-gray-500 block mb-1" data-t="rtDevice">RT设备</label><input type="number" id="tradCost" value="38.7" step="0.1" class="std-input text-xs"></div>
+                        <div><label class="text-[10px] text-gray-500 block mb-1" data-t="rtBunker">RT机房</label><input type="number" id="tradBunker" value="15.5" step="0.1" class="std-input text-xs"></div>
+                    </div>
+                    <div id="tomoInputs" class="hidden mt-2 pt-2 border-t border-dashed border-gray-300">
+                        <div class="text-[10px] text-purple-600 font-bold mb-2 pt-1">+ TOMO</div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="text-[10px] text-gray-500 block mb-1" data-t="deviceCost">设备</label><input type="number" id="tomoCost" value="54.2" step="0.1" class="std-input text-xs"></div>
+                            <div><label class="text-[10px] text-gray-500 block mb-1" data-t="bunkerCost">机房</label><input type="number" id="tomoBunker" value="15.5" step="0.1" class="std-input text-xs"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-2 text-[10px] text-gray-400 italic" data-t="maintNote">*维保: 8%</div>
+            </div>
+
+            <!-- 3. Patient Load -->
+            <div class="card p-6 border-l-4 border-orange-500">
+                <h3 class="text-lg font-bold mb-4 text-gray-800 section-header border-b pb-2"><span data-t="patientLoad">日负载</span></h3>
+                
+                <div class="bg-orange-50 border border-orange-200 p-2 rounded text-[10px] text-orange-800 mb-4">
+                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> <strong data-t="hardLimitsTitle">硬性上限：</strong><br>
+                    <span id="hardLimitsContent"></span>
+                </div>
+
+                <!-- Aurora -->
+                <div class="mb-4">
+                    <label class="flex justify-between text-sm font-bold text-gray-700 mb-1">
+                        <span>NeuRT Aurora</span><span id="auroraVolLabel" class="text-blue-600 text-lg">120</span>
+                    </label>
+                    <input type="range" id="auroraVolSlider" min="60" max="180" value="120" class="w-full h-2 bg-blue-100 rounded-lg cursor-pointer accent-blue-600">
+                    <div class="w-full h-5 flex rounded overflow-hidden text-[9px] text-white font-bold text-center shadow-sm mt-1">
+                        <div id="auroraBarStd" class="bg-blue-500 flex items-center justify-center" style="width:88%">106</div>
+                        <div id="auroraBarCplx" class="bg-orange-500 flex items-center justify-center" style="width:12%">14</div>
+                    </div>
+                </div>
+
+                <!-- Competitor -->
+                <div class="mb-4">
+                    <label class="flex justify-between text-sm font-bold text-gray-700 mb-1">
+                        <span id="compVolTitle">Competitor</span><span id="tradVolLabel" class="text-gray-600 text-lg">85</span>
+                    </label>
+                    <input type="range" id="tradVolSlider" min="30" max="180" value="85" class="w-full h-2 bg-gray-200 rounded-lg cursor-pointer accent-gray-500">
+                    <div class="w-full h-5 flex rounded overflow-hidden text-[9px] text-white font-bold text-center shadow-sm mt-1">
+                        <div id="compBarStd" class="bg-gray-400 flex items-center justify-center" style="width:40%">60</div>
+                        <div id="compBarCplx" class="bg-purple-400 hidden flex items-center justify-center" style="width:0%"></div>
+                        <div id="compBarLost" class="bg-red-400 flex items-center justify-center" style="width:60%">25</div>
+                    </div>
+                    <div id="compVolDetail" class="text-[10px] text-gray-400 text-right mt-1"></div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 text-[10px] text-gray-500 border-t pt-3">
+                    <div class="flex items-center"><span class="legend-dot bg-blue-500"></span><span data-t="legStdA">Std(A)</span></div>
+                    <div class="flex items-center"><span class="legend-dot bg-orange-500"></span><span data-t="legCplxA">Cplx(A)</span></div>
+                    <div class="flex items-center"><span class="legend-dot bg-gray-400"></span><span data-t="legStdC">Std(C)</span></div>
+                    <div class="flex items-center"><span class="legend-dot bg-purple-400"></span><span data-t="legCplxC">Cplx(C)</span></div>
+                    <div class="flex items-center"><span class="legend-dot bg-red-400"></span><span data-t="legLost">Lost</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Results -->
+        <div class="lg:col-span-8 space-y-6">
+            
+            <!-- Grid (Payback First) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <!-- 1. Payback (Top Left) -->
+                <div class="card p-5 border border-blue-200 bg-gradient-to-br from-blue-50 to-white relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-20 h-20 bg-blue-100 rounded-bl-full -mr-10 -mt-10 z-0"></div>
+                    <div class="relative z-10">
+                        <div class="text-sm font-bold text-blue-900 mb-3 border-b border-blue-100 pb-2" data-t="paybackCardTitle">投资回收期</div>
+                        <div class="comp-row"><span class="comp-label">NeuRT Aurora</span><span class="comp-val text-blue-600 text-2xl" id="paybackAurora">--</span></div>
+                        <div class="comp-row"><span class="comp-label" data-t="resComp">Comp</span><span class="comp-val text-gray-500" id="paybackComp">--</span></div>
+                        <div class="diff-row border-blue-100"><span class="text-orange-500" data-t="speedAdvantage">优势</span><span class="text-orange-600 text-lg font-bold" id="paybackDiff">--</span></div>
+                    </div>
+                </div>
+
+                <!-- 2. CapEx (Top Right) -->
+                <div class="card p-5 border border-gray-100">
+                    <div class="text-sm font-bold text-gray-700 mb-3 border-b pb-2" data-t="resCapex">初始投资</div>
+                    <div class="comp-row"><span class="comp-label">NeuRT Aurora</span><span class="comp-val text-blue-600" id="capexAurora">--</span></div>
+                    <div class="comp-row"><span class="comp-label" data-t="resComp">Comp</span><span class="comp-val text-gray-600" id="capexComp">--</span></div>
+                    <div class="diff-row"><span class="text-green-600" data-t="resDiff">差额</span><span class="text-green-600 font-bold" id="capexDiffVal">--</span></div>
+                </div>
+
+                <!-- 3. 5-Year Profit -->
+                <div class="card p-5 border border-gray-100">
+                    <div class="text-sm font-bold text-gray-700 mb-3 border-b pb-2" data-t="res5Yr">5年累计现金流</div>
+                    <div class="comp-row"><span class="comp-label">NeuRT Aurora</span><span class="comp-val text-blue-600" id="profit5Aurora">--</span></div>
+                    <div class="comp-row"><span class="comp-label" data-t="resComp">Comp</span><span class="comp-val text-gray-600" id="profit5Comp">--</span></div>
+                    <div class="diff-row"><span class="text-green-600" data-t="res5YrGain">增益</span><span class="text-green-600 font-bold" id="profit5Diff">--</span></div>
+                </div>
+
+                <!-- 4. Lifecycle -->
+                <div class="card p-5 border border-gray-100">
+                    <div class="text-sm font-bold text-gray-700 mb-3 border-b pb-2"><span data-t="resLife">全周期</span> (<span id="lifeLabel">12</span><span data-t="unitYrShort">Y</span>)</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-[10px] text-gray-400 font-bold mb-1" data-t="resTotalProfit">总净利</div>
+                            <div class="text-xs text-blue-600 font-bold">A: <span id="lifeProfitAurora">--</span></div>
+                            <div class="text-xs text-gray-500">C: <span id="lifeProfitComp">--</span></div>
+                            <div class="text-xs text-green-600 font-bold border-t mt-1 pt-1">Δ: <span id="lifeProfitDiff">--</span></div>
+                        </div>
+                        <div class="border-l pl-4">
+                            <div class="text-[10px] text-gray-400 font-bold mb-1">IRR %</div>
+                            <div class="text-xs text-blue-600 font-bold">A: <span id="irrAurora">--</span></div>
+                            <div class="text-xs text-gray-500">C: <span id="irrComp">--</span></div>
+                            <div class="text-xs text-green-600 font-bold border-t mt-1 pt-1">Δ: <span id="irrDiff">--</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Annual Details -->
+            <div class="card p-5 border border-gray-100 bg-gray-50 mt-6">
+                <div class="text-sm font-bold text-gray-700 mb-3 border-b pb-2"><span data-t="resAnnOps">年度运营</span> (Miliar Rp)</div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="border-r border-dashed border-gray-300 pr-4">
+                        <div class="text-xs font-bold text-blue-600 mb-2">NeuRT Aurora</div>
+                        <div class="detail-row"><span data-t="rowRev">Rev</span><span class="font-mono" id="annRevAurora">--</span></div>
+                        <div class="detail-row"><span data-t="rowOpex">OpEx</span><span class="text-red-400 font-mono" id="annOpexAurora">--</span></div>
+                        <div class="detail-row"><span data-t="rowMaint">Maint</span><span class="text-red-500 font-bold font-mono" id="annMaintAurora">--</span></div>
+                        <div class="detail-row border-t mt-1 pt-1"><span class="font-bold" data-t="rowNet">Net</span><span class="font-bold" id="annProfitAurora">--</span></div>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold text-gray-600 mb-2" data-t="resComp">Comp</div>
+                        <div class="detail-row"><span data-t="rowRev">Rev</span><span class="font-mono" id="annRevComp">--</span></div>
+                        <div class="detail-row"><span data-t="rowOpex">OpEx</span><span class="text-red-400 font-mono" id="annOpexComp">--</span></div>
+                        <div class="detail-row"><span data-t="rowMaint">Maint</span><span class="text-red-500 font-bold font-mono" id="annMaintComp">--</span></div>
+                        <div class="detail-row border-t mt-1 pt-1"><span class="font-bold" data-t="rowNet">Net</span><span class="font-bold" id="annProfitComp">--</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart -->
+            <div class="card p-6 mt-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-4"><span data-t="chartTitle">全周期现金流</span></h3>
+                <div class="relative h-80 w-full"><canvas id="roiChart"></canvas></div>
+            </div>
+
+            <!-- Insight -->
+            <div class="card p-6 bg-blue-50 border border-blue-200 relative mt-6 mb-6">
+                <div class="absolute top-0 right-0 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg shadow-sm" id="paybackBadge">Aurora Payback: --</div>
+                <h4 class="font-bold text-blue-800 mb-2"><i class="fa-solid fa-lightbulb mr-2"></i><span data-t="insightTitle">战略洞察</span></h4>
+                <div id="strategyText" class="text-sm text-blue-900 space-y-2 leading-relaxed"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="static-footer flex justify-between">
+        <div>
+            <span data-t="footerRateLabel">汇率 (BCA):</span> 1 USD = 
+            <input type="number" id="exchangeRateInput" value="16350" class="rate-input" onchange="updateRate()"> IDR
+        </div>
+        <div class="text-xs text-gray-400" id="rateTimestamp">BCA TT Counter (Ref)</div>
+    </footer>
+
+    <script>
+        // --- Configuration ---
+        let currentLang = 'zh';
+        let currentExchangeRate = 16350; 
+        const BILLION = 1000000000;
+        const COMP_RT_MAX = 75; 
+        const VAR_OPEX_RATE = 0.15; 
+        const MAINTENANCE_RATE = 0.08;
+
+        // --- Dictionary ---
+        const translations = {
+            zh: {
+                navTitle: "放疗项目 ROI 计算器", marketParams: "市场与财务参数", bpjsRate: "BPJS报销 (Rp/次)", workingDays: "年工作日", lifecycle: "全周期 (年)", complexRatio: "复杂病例比例", standardCases: "普通病例", 
+                impactNoteHtml: "<strong>影响：</strong> 复杂病例 (CSI, TBI, 多发转移) 需 TOMO/Aurora。", 
+                compStrategy: "竞争对手策略", addTomo: "增加 TOMO?", capexInputTitle: "初始投入 CapEx", deviceCost: "设备费", bunkerCost: "机房费", rtDevice: "RT 设备", rtBunker: "RT 机房", maintNote: "*维保 (8%): 基于设备价", 
+                patientLoad: "日治疗量", hardLimitsTitle: "硬性上限：", hardLimitsContent: "Aurora: 180 (5min)<br>Comp: 75 (12min)", unitPt: "人/天", compLabelShort: "竞品", compVolTitle: "竞争对手 (总需求)", compVolDetailPrefix: "上限:", compVolDetailOver: "溢出", 
+                legStdA: "普通(A)", legCplxA: "复杂(A)", legStdC: "普通(C)", legCplxC: "复杂(C)", legLost: "流失", lostTooltip: "流失", 
+                resCapex: "初始投资", resComp: "竞争对手", resDiff: "差额", resAnnOps: "年度运营账单", rowRev: "营收", rowOpex: "变动运营(15%)", rowMaint: "维保(8%)", rowNet: "净利", 
+                res5Yr: "5年累计现金流 (含回本)", res5YrNote: "公式: (年净利×5) - 初始投入", res5YrGain: "5年增益", resLife: "全周期", resTotalProfit: "总净利 (Miliar)", chartTitle: "全周期累计现金流", chartYr: "第", chartYrSuf: "年", 
+                insightTitle: "战略洞察", paybackCardTitle: "投资回收期", speedAdvantage: "速度优势", paybackBadgePre: "Aurora 回本: ", unitYr: "年", unitYrShort: "年", saveStr: "节省", investStr: "多投", fasterStr: "快", fasterSuf: "年", footerRateLabel: "汇率 (BCA):",
+                stratDualTitle: "双机模式 (高维保陷阱)",
+                stratDualText1: "<strong>双重维保：</strong> 两台设备产生双倍维保费，每年侵蚀利润",
+                stratDualText2: "<strong>ROI 拖累：</strong> 极高的初始投入和运营成本将 IRR 拉低至",
+                stratSingleTitle: "单机模式 (营收受限)",
+                stratSingleText1: "<strong>通量封顶：</strong> 竞品日治疗量被硬件限制在 75 人，无法承接更多需求。",
+                stratSingleText2: "<strong>收入流失：</strong> 由于产能不足，每年白白流失潜在收入"
+            },
+            en: {
+                navTitle: "RT ROI Calculator", marketParams: "Market & Financials", bpjsRate: "BPJS Rate (Rp/Frac)", workingDays: "Working Days", lifecycle: "Lifecycle (Yrs)", complexRatio: "Complex Ratio", standardCases: "Std Cases", impactNoteHtml: "<strong>Impact:</strong> Complex cases (CSI, TBI, Multi-Mets) need TOMO/Aurora.", compStrategy: "Competitor Strategy", addTomo: "Add TOMO?", capexInputTitle: "CapEx Inputs", deviceCost: "Device", bunkerCost: "Bunker", rtDevice: "RT Device", rtBunker: "RT Bunker", maintNote: "*Maint (8%): Fixed % of Device", patientLoad: "Daily Load", hardLimitsTitle: "Hard Limits:", hardLimitsContent: "Aurora: 180 (5min)<br>Comp: 75 (12min)", unitPt: "pts/day", compLabelShort: "Comp", compVolTitle: "Competitor (Demand)", compVolDetailPrefix: "Limit:", compVolDetailOver: "over", legStdA: "Std(A)", legCplxA: "Cplx(A)", legStdC: "Std(C)", legCplxC: "Cplx(C)", legLost: "Lost", lostTooltip: "Lost", resCapex: "Initial CapEx", resComp: "Competitor", resDiff: "Diff", resAnnOps: "Annual Ops", rowRev: "Rev", rowOpex: "Var.OpEx(15%)", rowMaint: "Maint(8%)", rowNet: "Net Profit", res5Yr: "5-Year Cumul. Cashflow", res5YrNote: "Formula: (Net×5) - CapEx", res5YrGain: "5Y Gain", resLife: "Lifecycle", resTotalProfit: "Total Profit (Miliar)", chartTitle: "Lifecycle Cumulative Cashflow", chartYr: "Year", chartYrSuf: "", insightTitle: "Strategic Insight", paybackCardTitle: "Payback Period", speedAdvantage: "Speed Advantage", paybackBadgePre: "Payback: ", unitYr: "Year", unitYrShort: "Y", saveStr: "Saves", investStr: "Invests", fasterStr: "", fasterSuf: "Y Faster", footerRateLabel: "Rate (BCA):",
+                stratDualTitle: "Dual Machine (Maintenance Trap)",
+                stratDualText1: "<strong>Double Maintenance:</strong> Paying 8% on TWO machines drains annual profit by",
+                stratDualText2: "<strong>ROI Drag:</strong> High CapEx & OpEx drags down IRR to",
+                stratSingleTitle: "Single Machine (Revenue Cap)",
+                stratSingleText1: "<strong>Throughput Cap:</strong> Hardware limited to 75 pts/day, capping growth.",
+                stratSingleText2: "<strong>Revenue Leakage:</strong> Annual lost revenue opportunity of"
+            },
+            id: {
+                navTitle: "Kalkulator ROI RT", marketParams: "Parameter Keuangan", bpjsRate: "Tarif BPJS (Rp)", workingDays: "Hari Kerja", lifecycle: "Siklus (Thn)", complexRatio: "Rasio Kompleks", standardCases: "Kasus Std", impactNoteHtml: "<strong>Dampak:</strong> Kasus kompleks (CSI, TBI) butuh TOMO/Aurora.", compStrategy: "Strategi Kompetitor", addTomo: "Tambah TOMO?", capexInputTitle: "Input CapEx", deviceCost: "Alat", bunkerCost: "Bunker", rtDevice: "Alat RT", rtBunker: "Bunker RT", maintNote: "*Maint (8%): Dari harga alat", patientLoad: "Beban Pasien", hardLimitsTitle: "Batas:", hardLimitsContent: "Aurora: 180 (5mnt)<br>Komp: 75 (12mnt)", unitPt: "psn/hari", compLabelShort: "Komp", compVolTitle: "Kompetitor (Permintaan)", compVolDetailPrefix: "Batas:", compVolDetailOver: "lebih", legStdA: "Std(A)", legCplxA: "Kmplks(A)", legStdC: "Std(K)", legCplxC: "Kmplks(K)", legLost: "Hilang", lostTooltip: "Hilang", resCapex: "Investasi Awal", resComp: "Kompetitor", resDiff: "Selisih", resAnnOps: "Ops Tahunan", rowRev: "Omzet", rowOpex: "OpEx(15%)", rowMaint: "Maint(8%)", rowNet: "Laba Bersih", res5Yr: "Arus Kas 5 Thn", res5YrNote: "Rumus: (Laba×5) - CapEx", res5YrGain: "Gain 5Thn", resLife: "Siklus", resTotalProfit: "Total Laba (Miliar)", chartTitle: "Arus Kas Kumulatif", chartYr: "Thn", chartYrSuf: "", insightTitle: "Wawasan", paybackCardTitle: "Periode Balik Modal", speedAdvantage: "Keunggulan", paybackBadgePre: "Balik Modal: ", unitYr: "Tahun", unitYrShort: "Thn", saveStr: "Hemat", investStr: "Lebih", fasterStr: "", fasterSuf: "Thn Cepat", footerRateLabel: "Kurs (BCA):",
+                stratDualTitle: "Mesin Ganda (Beban Maintenance)",
+                stratDualText1: "<strong>Maintenance Ganda:</strong> Membayar 8% untuk DUA mesin mengurangi laba sebesar",
+                stratDualText2: "<strong>Beban ROI:</strong> Maintenance ganda menurunkan IRR menjadi",
+                stratSingleTitle: "Mesin Tunggal (Batas Pendapatan)",
+                stratSingleText1: "<strong>Batas Throughput:</strong> Terbatas 75 pasien/hari.",
+                stratSingleText2: "<strong>Kebocoran Pendapatan:</strong> Kehilangan potensi pendapatan tahunan sebesar"
+            }
+        };
+
+        // --- Helper Functions ---
+        const getEl = (id) => document.getElementById(id);
+        
+        function updateRate() {
+            const val = parseFloat(getEl('exchangeRateInput').value);
+            if(val > 0) {
+                currentExchangeRate = val;
+                calculate();
+            }
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+            getEl(`btn-${lang}`).classList.add('active');
+            
+            // Force refresh all static text
+            document.querySelectorAll('[data-t]').forEach(el => {
+                const key = el.getAttribute('data-t');
+                if(translations[lang][key]) el.innerHTML = translations[lang][key];
+            });
+            getEl('hardLimitsContent').innerHTML = translations[lang].hardLimitsContent;
+            getEl('impactNoteHtml').innerHTML = translations[lang].impactNoteHtml;
+            getEl('navTitle').innerText = translations[lang].navTitle;
+            document.title = translations[lang].navTitle;
+            calculate();
+        }
+
+        function calculateIRR(initialInvestment, annualCashFlow, years) {
+            if (annualCashFlow <= 0) return -100;
+            if (initialInvestment <= 0) return 999; 
+            let low = -0.99, high = 10.0, irr = 0;
+            for(let i=0; i<50; i++) {
+                let mid = (low + high) / 2;
+                let factor = (1 - Math.pow(1 + mid, -years)) / mid;
+                if (Math.abs(-initialInvestment + annualCashFlow * factor) < 1) { irr = mid; break; }
+                if (-initialInvestment + annualCashFlow * factor > 0) low = mid; else high = mid;
+                irr = mid;
+            }
+            return irr * 100;
+        }
+
+        // --- Chart Setup ---
+        const ctx = document.getElementById('roiChart').getContext('2d');
+        const roiChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'NeuRT Aurora', borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', borderWidth: 3, fill: true, data: [] }, { label: 'Competitor', borderColor: '#9333ea', borderWidth: 2, borderDash: [5, 5], fill: false, data: [] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: '#e2e8f0' } } } }
+        });
+
+        // --- Main Calc ---
+        function calculate() {
+            try {
+                const t = translations[currentLang];
+                const price = parseFloat(getEl('priceInput').value) || 0;
+                const days = parseInt(getEl('workingDaysInput').value) || 250;
+                const life = parseInt(getEl('lifecycleInput').value) || 12;
+                const cplxRatio = parseInt(getEl('mixSlider').value) / 100;
+                const hasTomo = getEl('competitorToggle').checked;
+
+                // Updates
+                getEl('complexLabel').innerText = Math.round(cplxRatio * 100);
+                getEl('lifeLabel').innerText = life;
+                
+                // CapEx
+                const aurCostVal = parseFloat(getEl('auroraCost').value);
+                const aurBunkVal = parseFloat(getEl('auroraBunker').value);
+                const aurCapEx = (aurCostVal + aurBunkVal) * BILLION;
+
+                const rtCostVal = parseFloat(getEl('tradCost').value);
+                const rtBunkVal = parseFloat(getEl('tradBunker').value);
+                let compCapEx = (rtCostVal + rtBunkVal) * BILLION;
+                let compDevCostOnly = rtCostVal * BILLION;
+
+                if (hasTomo) {
+                    const tomoCostVal = parseFloat(getEl('tomoCost').value);
+                    const tomoBunkVal = parseFloat(getEl('tomoBunker').value);
+                    compCapEx += (tomoCostVal + tomoBunkVal) * BILLION;
+                    compDevCostOnly += (tomoCostVal * BILLION);
+                    getEl('tomoInputs').classList.remove('hidden');
+                    getEl('competitorStatus').innerHTML = currentLang === 'zh' ? '<strong class="text-purple-700">双机方案 (RT + TOMO)</strong>' : (currentLang === 'id' ? '<strong class="text-purple-700">Mesin Ganda</strong>' : '<strong class="text-purple-700">Dual (RT+TOMO)</strong>');
+                    getEl('compConfigTitle').innerText = "RT + TOMO";
+                } else {
+                    getEl('tomoInputs').classList.add('hidden');
+                    getEl('competitorStatus').innerHTML = currentLang === 'zh' ? '<strong class="text-gray-700">单机方案 (Standard RT)</strong>' : (currentLang === 'id' ? '<strong class="text-gray-700">Mesin Tunggal</strong>' : '<strong class="text-gray-700">Single (RT)</strong>');
+                    getEl('compConfigTitle').innerText = "Standard RT";
+                }
+
+                // Volume
+                const volA = parseInt(getEl('auroraVolSlider').value);
+                const volC_Target = parseInt(getEl('tradVolSlider').value);
+                const demandCplx = Math.round(volC_Target * cplxRatio);
+                const demandStd = volC_Target - demandCplx;
+                
+                const treatedStd = Math.min(demandStd, COMP_RT_MAX);
+                const lostStd = demandStd - treatedStd;
+                const treatedCplx = hasTomo ? demandCplx : 0;
+                const lostCplx = hasTomo ? 0 : demandCplx;
+                
+                const totalTreatedC = treatedStd + treatedCplx;
+                const totalLost = lostStd + lostCplx;
+
+                // UI Bars
+                getEl('auroraVolLabel').innerText = volA;
+                getEl('tradVolLabel').innerText = volC_Target;
+                const aCplx = Math.round(volA * cplxRatio);
+                
+                getEl('auroraBarStd').style.width = `${((volA-aCplx)/volA)*100}%`;
+                getEl('auroraBarStd').innerText = volA - aCplx;
+                getEl('auroraBarCplx').style.width = `${(aCplx/volA)*100}%`;
+                getEl('auroraBarCplx').innerText = aCplx || "";
+
+                getEl('compBarStd').style.width = `${(treatedStd/volC_Target)*100}%`;
+                getEl('compBarStd').innerText = treatedStd;
+                
+                const cplxPct = (treatedCplx/volC_Target)*100;
+                if (treatedCplx > 0) {
+                    getEl('compBarCplx').style.width = `${cplxPct}%`;
+                    getEl('compBarCplx').classList.remove('hidden');
+                    getEl('compBarCplx').innerText = treatedCplx;
+                } else { getEl('compBarCplx').classList.add('hidden'); }
+
+                const lostPct = (totalLost/volC_Target)*100;
+                if (totalLost > 0) {
+                    getEl('compBarLost').style.width = `${lostPct}%`;
+                    getEl('compBarLost').classList.remove('hidden');
+                    getEl('compBarLost').innerText = totalLost;
+                    getEl('compBarLost').title = `${t.lostTooltip}: ${totalLost}`;
+                } else { getEl('compBarLost').classList.add('hidden'); }
+
+                getEl('compVolDetail').innerText = `${t.compVolDetailPrefix} ${COMP_RT_MAX}/${t.unitPt.split('/')[1] || 'day'}`;
+
+                // Financials
+                const revA = volA * price * days;
+                const revC = totalTreatedC * price * days;
+                const opexA = revA * VAR_OPEX_RATE;
+                const opexC = revC * VAR_OPEX_RATE;
+                const maintA = (aurCostVal * BILLION) * MAINTENANCE_RATE;
+                const maintC = compDevCostOnly * MAINTENANCE_RATE;
+
+                const netA = revA - opexA - maintA;
+                const netC = revC - opexC - maintC;
+
+                const pbA = aurCapEx / netA;
+                const pbC = compCapEx / netC;
+                const irrA = calculateIRR(aurCapEx, netA, life);
+                const irrC = calculateIRR(compCapEx, netC, life);
+
+                // Render Results
+                const pbAStr = `${pbA.toFixed(1)} ${t.unitYrShort}`;
+                const pbCStr = (isFinite(pbC) && pbC > 0) ? `${pbC.toFixed(1)} ${t.unitYrShort}` : ">15 " + t.unitYrShort;
+                getEl('paybackAurora').innerText = pbAStr;
+                getEl('paybackComp').innerText = pbCStr;
+                getEl('paybackBadge').innerText = `${t.paybackBadgePre}${pbAStr}`;
+                
+                if(isFinite(pbC) && pbC > 0) {
+                    getEl('paybackDiff').innerText = `${t.fasterStr} ${(pbC - pbA).toFixed(1)} ${t.fasterSuf}`;
+                } else { getEl('paybackDiff').innerText = "Aurora Win"; }
+
+                getEl('capexAurora').innerText = `Rp ${(aurCapEx/BILLION).toFixed(1)} Miliar`;
+                getEl('capexComp').innerText = `Rp ${(compCapEx/BILLION).toFixed(1)} Miliar`;
+                const cDiff = (compCapEx - aurCapEx)/BILLION;
+                getEl('capexDiffVal').innerText = cDiff > 0 ? `${t.saveStr} ${cDiff.toFixed(1)}` : `${t.investStr} ${Math.abs(cDiff).toFixed(1)}`;
+                getEl('capexDiffVal').className = cDiff > 0 ? "text-green-600 font-bold" : "text-blue-600 font-bold";
+
+                getEl('annRevAurora').innerText = (revA/BILLION).toFixed(1);
+                getEl('annOpexAurora').innerText = `-${(opexA/BILLION).toFixed(1)}`;
+                getEl('annMaintAurora').innerText = `-${(maintA/BILLION).toFixed(2)}`;
+                getEl('annProfitAurora').innerText = (netA/BILLION).toFixed(1);
+                
+                getEl('annRevComp').innerText = (revC/BILLION).toFixed(1);
+                getEl('annOpexComp').innerText = `-${(opexC/BILLION).toFixed(1)}`;
+                getEl('annMaintComp').innerText = `-${(maintC/BILLION).toFixed(2)}`;
+                getEl('annProfitComp').innerText = (netC/BILLION).toFixed(1);
+
+                const cf5A = (netA * 5) - aurCapEx;
+                const cf5C = (netC * 5) - compCapEx;
+                const cf5Diff = cf5A - cf5C;
+                getEl('profit5Aurora').innerText = `Rp ${(cf5A/BILLION).toFixed(1)} Miliar`;
+                getEl('profit5Comp').innerText = `Rp ${(cf5C/BILLION).toFixed(1)} Miliar`;
+                getEl('profit5Diff').innerText = `${cf5Diff>0?'+':''} ${Math.abs(cf5Diff/BILLION).toFixed(1)} Miliar`;
+                getEl('profit5Diff').className = cf5Diff > 0 ? "text-green-600 font-bold" : "text-red-600 font-bold";
+
+                const lifeA = (netA * life) - aurCapEx;
+                const lifeC = (netC * life) - compCapEx;
+                getEl('lifeProfitAurora').innerText = (lifeA/BILLION).toFixed(0);
+                getEl('lifeProfitComp').innerText = (lifeC/BILLION).toFixed(0);
+                getEl('lifeProfitDiff').innerText = `${(lifeA - lifeC)/BILLION > 0 ? '+' : ''}${((lifeA - lifeC)/BILLION).toFixed(0)}`;
+                getEl('irrAurora').innerText = `${irrA.toFixed(1)}%`;
+                getEl('irrComp').innerText = `${irrC.toFixed(1)}%`;
+                const irrD = irrA - irrC;
+                getEl('irrDiff').innerText = `${irrD>0?'+':''}${irrD.toFixed(1)}%`;
+
+                // Strategy Text (Dynamic)
+                const lostRevenue = (totalLost * price * days) / BILLION;
+                if (hasTomo) {
+                    const exMaint = (parseFloat(getEl('tomoCost').value) * BILLION * MAINTENANCE_RATE) / BILLION;
+                    getEl('strategyText').innerHTML = `
+                        <p class="font-bold text-purple-700">${t.stratDualTitle}</p>
+                        <ul class="list-disc pl-4 mt-2">
+                            <li>${t.stratDualText1} <strong>Rp ${exMaint.toFixed(2)} Miliar/${t.unitYrShort}</strong>.</li>
+                            <li>${t.stratDualText2} <strong>${irrC.toFixed(1)}%</strong>.</li>
+                        </ul>`;
+                } else {
+                    getEl('strategyText').innerHTML = `
+                        <p class="font-bold text-blue-700">${t.stratSingleTitle}</p>
+                        <ul class="list-disc pl-4 mt-2">
+                            <li>${t.stratSingleText1}</li>
+                            <li>${t.stratSingleText2} <strong>Rp ${lostRevenue.toFixed(1)} Miliar</strong>.</li>
+                        </ul>`;
+                }
+
+                // Chart
+                const labels = ['Start'];
+                const dA = [-aurCapEx/BILLION];
+                const dC = [-compCapEx/BILLION];
+                for(let i=1; i<=life; i++) {
+                    labels.push(`${t.chartYr} ${i} ${t.chartYrSuf}`);
+                    dA.push((-aurCapEx + netA*i)/BILLION);
+                    dC.push((-compCapEx + netC*i)/BILLION);
+                }
+                roiChart.data.labels = labels;
+                roiChart.data.datasets[0].data = dA;
+                roiChart.data.datasets[1].data = dC;
+                roiChart.update();
+
+            } catch (e) { console.error(e); }
+        }
+
+        // Bind Events
+        const inputs = document.querySelectorAll('input');
+        inputs.forEach(i => {
+            i.addEventListener('input', calculate);
+            i.addEventListener('change', calculate);
+        });
+
+        // Init
+        window.onload = () => {
+            setLang('zh'); // Default to ZH
+        };
+    </script>
+</body>
+</html>
