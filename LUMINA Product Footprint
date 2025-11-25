@@ -1,0 +1,183 @@
+import React from 'react';
+import { MapPin, Globe, Database } from 'lucide-react';
+
+// --- 数据源 (全量 25 家医院，按地理归类) ---
+
+const regions = [
+  {
+    title: "Greater Jakarta",
+    subtitle: "JABODETABEK HQ AREA",
+    color: "#002B5B", // Deep Navy
+    hospitals: [
+      { name: "RS Marinir Cilandak", city: "Jakarta" },
+      { name: "RS Bhayangkara Lemdiklat", city: "Jakarta" },
+      { name: "RS Adhyaksa", city: "Jakarta" },
+      { name: "RS Tebet", city: "Jakarta" },
+      { name: "RS Primaya Depok", city: "Depok" },
+      { name: "RS Bhayangkara Brimob", city: "Depok" },
+      { name: "RS Harum Sisma Medika", city: "Bekasi" },
+      { name: "RS EMC Cibitung", city: "Cibitung" },
+      { name: "RS St. Carolus Summarecon", city: "Tangerang" },
+    ]
+  },
+  {
+    title: "West Java Region",
+    subtitle: "PROVINCIAL COVERAGE",
+    color: "#0F4C81", // Classic Blue
+    hospitals: [
+      { name: "RS UNPAD", city: "Bandung" },
+      { name: "RSUD Sumedang", city: "Sumedang" },
+      { name: "RS Cimalaka", city: "Sumedang" },
+      { name: "RS dr. Abdul Radjak", city: "Purwakarta" },
+      { name: "RS Puri Asih", city: "Purwakarta" },
+      { name: "RS Mitra Family", city: "Karawang" },
+      { name: "RS Bhakti Medicare", city: "Sukabumi" },
+      { name: "RS Jantung (JHC)", city: "Tasikmalaya" },
+    ]
+  },
+  {
+    title: "Sumatra Region",
+    subtitle: "WESTERN EXPANSION",
+    color: "#B4975A", // Gold/Bronze
+    hospitals: [
+      { name: "RS Sansani", city: "Pekanbaru" },
+      { name: "RS Pekanbaru Medical Ctr", city: "Pekanbaru" },
+      { name: "RS Kasih Ibu", city: "Rengat" },
+      { name: "RS Ibnu Sina Payakumbuh", city: "W. Sumatra" },
+      { name: "RS Ibnu Sina Simpang Empat", city: "W. Sumatra" },
+    ]
+  },
+  {
+    title: "Islands & East",
+    subtitle: "NATIONAL REACH",
+    color: "#5C6C7B", // Slate Grey
+    hospitals: [
+      { name: "RS Budi Kemuliaan", city: "Batam" },
+      { name: "RSAL Dr. Midiyato Suratani", city: "Tg. Pinang" },
+      { name: "RS Ibnu Sina Makassar", city: "Makassar" },
+    ]
+  }
+];
+
+// --- 组件 ---
+
+const RegionColumn = ({ region }) => (
+  <div className="flex-1 flex flex-col h-full bg-white border border-slate-200 shadow-sm relative overflow-hidden">
+    {/* 顶部彩色条 */}
+    <div className="h-1.5 w-full shrink-0" style={{ backgroundColor: region.color }}></div>
+    
+    {/* 标题区 - 稍微减少 padding */}
+    <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
+      <h3 className="font-bold text-base leading-tight text-slate-800">{region.title}</h3>
+      <p className="text-[9px] font-bold tracking-widest uppercase mt-0.5 opacity-60" style={{ color: region.color }}>
+        {region.subtitle}
+      </p>
+    </div>
+
+    {/* 列表区 - 移除 overflow-auto，改为 flex 布局自动分配空间 */}
+    <div className="px-4 py-3 flex-1 flex flex-col">
+      <ul className="flex flex-col h-full justify-start gap-2.5"> {/* 使用 gap 代替 space-y 以获得更均匀的分布 */}
+        {region.hospitals.map((h, i) => (
+          <li key={i} className="flex flex-col justify-center leading-tight">
+            {/* 调整字体大小并允许换行 */}
+            <span className="text-[10px] font-bold text-slate-700 break-words">
+              {h.name}
+            </span>
+            <span className="text-[9px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
+              <MapPin className="w-2.5 h-2.5" /> {h.city}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    {/* 底部计数 */}
+    <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-right shrink-0 mt-auto">
+       <span className="text-[10px] font-bold text-slate-300">{region.hospitals.length} SITES</span>
+    </div>
+  </div>
+);
+
+export default function LuminaRegionalPPT() {
+  return (
+    <div className="w-full h-screen bg-gray-200 flex items-center justify-center p-4 font-sans">
+      
+      {/* 16:9 PPT 容器 - 强制比例 */}
+      <div className="bg-white w-full max-w-6xl aspect-video shadow-2xl overflow-hidden flex flex-col relative">
+        
+        {/* Header */}
+        <div className="px-10 py-6 bg-[#002B5B] text-white flex justify-between items-center shrink-0">
+          <div>
+            <div className="flex items-center gap-3">
+              <Globe className="w-7 h-7 text-[#B4975A]" />
+              <h1 className="text-3xl font-bold tracking-tight">Extensive Regional Coverage</h1>
+            </div>
+            <p className="text-blue-200 text-xs font-light tracking-wide mt-1 ml-10">
+              INDONESIA INSTALLATION NETWORK & FOOTPRINT 2025
+            </p>
+          </div>
+          <div className="text-right">
+             <div className="text-2xl font-bold tracking-widest text-white">LUMINA</div>
+             <div className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-blue-100 mt-1 inline-block">
+               CONFIDENTIAL
+             </div>
+          </div>
+        </div>
+
+        {/* Main Content Area - 确保高度自适应 */}
+        <div className="flex-1 px-10 py-6 bg-slate-100/50 overflow-hidden">
+          <div className="flex gap-4 h-full items-stretch">
+            {regions.map((region, idx) => (
+              <RegionColumn key={idx} region={region} />
+            ))}
+          </div>
+        </div>
+
+        {/* Footer / Legend */}
+        <div className="px-10 py-4 bg-white border-t border-slate-200 shrink-0">
+          <div className="flex items-center justify-between">
+            
+            {/* Legend Area */}
+            <div className="flex items-center gap-8">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-2">
+                Portfolio Included:
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                <div className="text-[10px] text-slate-600">
+                  <span className="font-bold">Urology</span> (ESWL)
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                <div className="text-[10px] text-slate-600">
+                  <span className="font-bold">ICU/OT</span> (Ventilator/Pumps)
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                <div className="text-[10px] text-slate-600">
+                  <span className="font-bold">Cardiac</span> (ECG/Defib)
+                </div>
+              </div>
+            </div>
+
+            {/* Total Count */}
+            <div className="flex items-center gap-3 pl-8 border-l border-slate-200">
+              <Database className="w-4 h-4 text-[#002B5B]" />
+              <div className="text-right">
+                <div className="text-xl font-bold text-[#002B5B] leading-none">25</div>
+                <div className="text-[9px] text-slate-400 uppercase font-bold">Total Active Hospitals</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
